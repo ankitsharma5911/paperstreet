@@ -9,7 +9,7 @@ Indian equities, index futures and options paper trading with virtual funds. Eac
 3. Select **Connect & validate feed**. Update the token daily, or whenever Zerodha rejects the session.
 4. Open **Futures & options** to browse current broker-listed contracts and place paper orders.
 
-The web-session adapter calls Zerodha's unofficial `/oms/quote` endpoint with an `enctoken` authorization header. It may be blocked or changed by Zerodha. It does not automate login, collect a password/OTP, or bypass broker challenges. Broker authentication and live production quotes cannot be verified until a valid user token is supplied in the app.
+The web-session adapter calls Zerodha's unofficial `/oms/quote` endpoint with an `enctoken` authorization header. It may be blocked or changed by Zerodha. It does not automate login, collect a password/OTP, or bypass broker challenges. The supplied daily token was checked on 20 October 2026. The read-only quote endpoint returned HTTP 400 (InputException: Bad Request), so authenticated quote access remains unverified. The token has not been placed in source or deployed as a working connection.
 
 Official alternatives are available in Data connections:
 
@@ -23,7 +23,9 @@ Official alternatives are available in Data connections:
 - Market and limit fills require a fresh exchange timestamp during weekday NSE continuous-market hours, 09:15–15:30 IST. Old exchange timestamps also prevent holiday or stale-price fills. There is no separate holiday-calendar integration.
 - A new execution quote is fetched before each submitted paper order. Up to ten open orders receive execution snapshots during polling.
 - Limit orders execute only while the app is open and the quote passes freshness checks.
-- Current index contract symbols, expiries, strikes and lot sizes are loaded from broker instrument masters and cached per day. No contract expiry or lot size is hardcoded into live trading.
+- Current index contract symbols, expiries, strikes, lot sizes, tick sizes and instrument tokens are loaded from broker instrument masters. The server caches public metadata in memory and, when available, the Worker Cache API. Concurrent downloads are combined.
+- The first signed-in request each new IST calendar day refreshes the instrument file. If loaded before 08:30 IST, it refreshes again on the first request after 08:30, following Zerodha’s recommended download time. An open tab in Broker data mode checks automatically, including after sleep. This is request-driven; no background job runs while the app is closed. The F&O screen shows the file date and fetch time, even while the broker token needs updating. Manual refresh is also available.
+- A failed daily refresh clears the selectable catalog, blocks new F&O orders and retries after one minute; yesterday’s metadata is never presented as today’s. Existing holdings and order history remain. Changed or removed contracts cancel affected pending paper orders. Incompatible position lot-size changes require review rather than rewriting units. Instrument-file last_price is never treated as a live quote.
 - Supported F&O underlyings are NIFTY, BANKNIFTY, FINNIFTY and MIDCPNIFTY, where listed. Equity derivatives and physical settlement are outside this version.
 
 ## Paper accounting

@@ -39,3 +39,15 @@ test('streaming CSV handles quoted commas and boundaries without loading the ful
 test('derivative instruments use broker lot sizes and expiries, never assumed contract names',()=>{
   const row={instrument_type:'CE',name:'NIFTY',expiry:'2026-10-27',tradingsymbol:'NIFTY26O2725000CE',lot_size:'65',strike:'25000',tick_size:'0.05',exchange:'NFO'};const c=normalizeInstrument(row,'kite','2026-10-20');assert.equal(c.lotSize,65);assert.equal(c.strike,2500000);assert.equal(c.id,'NFO:NIFTY26O2725000CE');assert.equal(normalizeInstrument({...row,expiry:'2026-10-19'},'kite','2026-10-20'),null);assert.equal(normalizeInstrument({...row,name:'UNKNOWN'},'kite','2026-10-20'),null);
 });
+
+test('daily public instruments load for a signed-in visitor without exposing or requiring a broker token',async()=>{
+  const csv='instrument_token,tradingsymbol,name,expiry,strike,tick_size,lot_size,instrument_type,exchange\n123,NIFTYTESTCE,NIFTY,2026-10-27,25000,0.05,65,CE,NFO\n';
+  assert.equal((await handleMarket(req('instruments'),{secret})).status,401);
+  const response=await handleMarket(req('instruments&refresh=1'),{...options,fetcher:async(url,init)=>{assert.equal(init.headers.Authorization,undefined);return new Response(csv);}});
+  assert.equal(response.status,200);const data=await response.json();assert.equal(data.asOf,'2026-10-20');assert.equal(data.revision,'2026-10-20-ready');assert.equal(data.instruments[0].lotSize,65);
+});
+
+test('HTTP 400 from the web quote endpoint reports its limitation without declaring the token invalid',async()=>{
+  const response=await handleMarket(req('connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})}),{...options,fetcher:async()=>new Response(token,{status:400})});
+  assert.equal(response.status,502);const data=await response.json();assert.match(data.error,/HTTP 400/);assert.equal(data.error.includes(token),false);assert.equal(response.headers.get('set-cookie'),null);
+});
