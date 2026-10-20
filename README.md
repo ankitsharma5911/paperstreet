@@ -53,6 +53,17 @@ Paper holdings, orders, chart samples and quotes remain in this browser and orig
 
 Requires Node.js 22.13 or newer.
 
+### Run the standalone app on Windows
+
+Open Command Prompt and run:
+
+```cmd
+cd /d "C:\Users\hp\OneDrive\Desktop\paper trading\paperstreet"
+npm run preview:terminal
+```
+
+Keep that terminal open while using the app, then visit <http://localhost:3000>. To stop the server, return to the same terminal and press **Ctrl+C**. Run the command again whenever you want to start the local app.
+
 ```sh
 npm ci
 npm run dev
