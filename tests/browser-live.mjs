@@ -35,6 +35,22 @@ try{
   await cdp('Runtime.enable');await cdp('Page.enable');await cdp('Fetch.enable',{patterns:[{urlPattern:'*/api/market/*',requestStage:'Request'}]});
   await cdp('Page.addScriptToEvaluateOnNewDocument',{source:`{const BaseDate=Date;window.Date=class extends BaseDate{constructor(...args){super(...(args.length?args:[${fixed}+performance.now()+(window.__fixtureOffset??0)]))}static now(){return ${fixed}+performance.now()|0?Math.floor(${fixed}+performance.now()):${fixed}}};}`.replace(`return ${fixed}+performance.now()|0?Math.floor(${fixed}+performance.now()):${fixed}`,`return Math.floor(${fixed}+performance.now()+(window.__fixtureOffset??0))`)});
   await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,deviceScaleFactor:1,mobile:false});await cdp('Page.navigate',{url:'http://127.0.0.1:3000/terminal/index.html#connections'});await wait(`!!document.querySelector('#broker-token')&&!document.querySelector('#broker-token').disabled`);
+  // Regression: a pasted credential must survive background ticks and same-provider renders.
+  const draftToken='pasted-draft-fixture-never-a-real-credential';
+  await click('[data-live="mode"][data-mode="simulation"]');await wait(`localStorage.getItem('paperstreet.mode')==='simulation'`);
+  await click('#broker-token');await cdp('Input.insertText',{text:draftToken});
+  await evaluate(`document.querySelector('#broker-token').setSelectionRange(4,12)`);await sleep(3500);
+  assert.equal(await evaluate(`document.querySelector('#broker-token').value`),draftToken,'Background simulation erased a pasted token');
+  assert.deepEqual(await evaluate(`({id:document.activeElement.id,start:document.activeElement.selectionStart,end:document.activeElement.selectionEnd})`),{id:'broker-token',start:4,end:12});
+  await evaluate(`window.dispatchEvent(new StorageEvent('storage',{key:'paperstreet.nse.v1',newValue:localStorage.getItem('paperstreet.nse.v1')}))`);
+  assert.equal(await evaluate(`document.querySelector('#broker-token').value`),draftToken,'Account storage update erased the token');
+  await click('[data-live="mode"][data-mode="live"]');await wait(`localStorage.getItem('paperstreet.mode')==='live'`);await sleep(200);
+  assert.equal(await evaluate(`document.querySelector('#broker-token').value`),draftToken,'Same-provider render erased the token');
+  await click('[data-live="connection-provider"][data-provider="kite"]');assert.equal(await evaluate(`document.querySelector('#broker-token').value`),'','Credentials carried into a different provider');
+  await input('#broker-token',draftToken);await input('#broker-api-key','fixture-api-key');await click('[data-live="connection-provider"][data-provider="kite"]');
+  assert.equal(await evaluate(`document.querySelector('#broker-token').value`),draftToken);assert.equal(await evaluate(`document.querySelector('#broker-api-key').value`),'fixture-api-key');
+  assert.equal(await evaluate(`Object.values(localStorage).join('').includes(${JSON.stringify(draftToken)})`),false);
+  await click('[data-live="connection-provider"][data-provider="zerodha-web"]');assert.equal(await evaluate(`document.querySelector('#broker-token').value`),'');
   await input('#broker-token','invalid-token-for-testing-only');await click('#broker-form button[type="submit"]');await wait(`document.querySelector('#broker-error')?.textContent.includes('rejected')`);assert.equal(await evaluate(`document.querySelector('#broker-token').value`),'');
   const testToken='fixture-session-token-never-a-real-credential';await input('#broker-token',testToken);await click('#broker-form button[type="submit"]');await wait(`document.querySelector('.connection-card.selected .status')?.textContent==='Connected'`);await wait(`JSON.parse(localStorage.getItem('paperstreet.live.v2.zerodha-web'))?.quotes.RELIANCE>0`);
   assert.equal(await evaluate(`Object.values(localStorage).join('').includes(${JSON.stringify(testToken)})`),false);await shot('connections-desktop.png');

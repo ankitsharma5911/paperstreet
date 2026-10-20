@@ -93,11 +93,20 @@ function ordersPage(){const filtered=state.orders.filter(o=>orderFilter==='all'|
 function watchlistPage(){const stocks=state.watchlist.map(stockBySymbol);return `${intro('Good ideas are worth keeping.','A little curiosity today could become your next great practice trade.','YOUR WATCHLIST')}<div class="page-toolbar"><span class="export-note">${stocks.length} companies on your radar</span><span class="toolbar-spacer"></span><button class="button button-secondary" data-action="add-watch">${icon('plus')} Add stocks</button></div><section class="panel">${stocks.length?marketTable(stocks,{watch:true,full:true}):empty('star','Follow your curiosity.','Add companies to your watchlist to keep their market prices close.','Add stocks','add-watch',true)}</section><p class="section-note">Select a company to view its chart and place a practice trade. Use the star to remove it from your watchlist.</p>`;}
 function render(){
   const active=document.activeElement,restore=active?.id==='market-filter'?{start:active.selectionStart,end:active.selectionEnd}:null;
+  // Keep credential inputs as DOM nodes only; never put their drafts in app state or storage.
+  const brokerForm=page==='connections'?$('#broker-form'):null;
+  const brokerInputs=brokerForm?[...brokerForm.querySelectorAll('input')].map(input=>({input,start:input.selectionStart,end:input.selectionEnd,direction:input.selectionDirection})):[];
   const focusKey=active?.closest('#main')?{tag:active.tagName,action:active.dataset.action,symbol:active.dataset.symbol,range:active.dataset.range,mode:active.dataset.mode,tab:active.dataset.tab,filter:active.dataset.filter,side:active.dataset.side,id:active.id,href:active.getAttribute('href')}:null;
   renderNav();$('#main').innerHTML=({overview,markets,portfolio:portfolioPage,orders:ordersPage,watchlist:watchlistPage,derivatives:()=>market.fno(),connections:()=>market.connectionsPage()}[page]??overview)();
+  const nextBrokerForm=$('#broker-form');
+  if(brokerForm&&brokerForm.dataset.provider===nextBrokerForm?.dataset.provider){
+    for(const {input}of brokerInputs){const replacement=nextBrokerForm.querySelector('#'+input.id);if(replacement){input.disabled=replacement.disabled;replacement.replaceWith(input);}}
+  }
   market.onPage(page);
   if(restore){const input=$('#market-filter');input.focus();input.setSelectionRange(restore.start,restore.end);}
   else if(focusKey){const replacement=[...document.querySelectorAll('#main button,#main a,#main select')].find(el=>el.tagName===focusKey.tag&&el.dataset.action===focusKey.action&&el.dataset.symbol===focusKey.symbol&&el.dataset.range===focusKey.range&&el.dataset.mode===focusKey.mode&&el.dataset.tab===focusKey.tab&&el.dataset.filter===focusKey.filter&&el.dataset.side===focusKey.side&&el.id===focusKey.id&&el.getAttribute('href')===focusKey.href);replacement?.focus({preventScroll:true});}
+  const credentialFocus=brokerInputs.find(({input})=>input===active&&input.isConnected&&!input.disabled);
+  if(credentialFocus){active.focus({preventScroll:true});active.setSelectionRange(credentialFocus.start,credentialFocus.end,credentialFocus.direction);}
 }
 function route(){const candidate=location.hash.slice(1);page=routes.some(r=>r[0]===candidate)?candidate:'overview';$('#sidebar').classList.remove('open');render();document.title=`${routes.find(r=>r[0]===page)[1]} · Paperstreet`;}
 function navigate(next){if(page===next)render();else location.hash=next;}
@@ -178,7 +187,7 @@ document.addEventListener('keydown',event=>{
 document.addEventListener('pointermove',event=>{const wrap=event.target.closest('#chart-wrap');if(!wrap)return;const rect=wrap.getBoundingClientRect(),fraction=(event.clientX-rect.left)/rect.width,clamped=Math.max(14,Math.min(633,fraction*730));const cross=$('#crosshair');cross.setAttribute('x1',clamped);cross.setAttribute('x2',clamped);cross.setAttribute('visibility','visible');const vals=history(selected,range,90);vals[89]=stockBySymbol(selected)?state.quotes[selected]:Math.round(2485730*(state.quotes.RELIANCE/STOCKS[0].price*.6+.4));const index=Math.min(89,Math.max(0,Math.round((clamped-14)/619*89)));const tooltip=$('#chart-tooltip');tooltip.style.display='block';tooltip.style.left=Math.min(rect.width-115,Math.max(5,event.clientX-rect.left+10))+'px';tooltip.style.top='8px';tooltip.textContent='Sim. '+money(vals[index]);});
 document.addEventListener('pointerout',event=>{if(event.target.closest('#chart-wrap')&&!event.relatedTarget?.closest?.('#chart-wrap')){const cross=$('#crosshair');if(cross)cross.setAttribute('visibility','hidden');const tip=$('#chart-tooltip');if(tip)tip.style.display='none';}});
 window.addEventListener('hashchange',route);
-window.addEventListener('storage',event=>{if(event.key===KEY&&event.newValue){try{const next=JSON.parse(event.newValue);if(validState(next)){state=next;render();updateTicket();}}catch{}}});
+window.addEventListener('storage',event=>{if(event.key===KEY&&event.newValue){try{const next=JSON.parse(event.newValue);if(validState(next)){state=next;if(page!=='connections')render();updateTicket();}}catch{}}});
 async function accountContext(nextMode,nextProvider,persist=true){
   mode=nextMode;provider=nextProvider;KEY=accountKey();
   try{const saved=localStorage.getItem(KEY);const parsed=saved?JSON.parse(saved):null;state=parsed&&validState(parsed)?parsed:createState(Date.now(),mode);if(persist){localStorage.setItem('paperstreet.mode',mode);localStorage.setItem('paperstreet.provider',provider);}}
@@ -197,4 +206,4 @@ route();
 if(persistenceWarning)notify(persistenceWarning,true);
 market.status().then(()=>market.poll(true));
 let lastSimulationTick=0;
-setInterval(async()=>{if(mode==='live'){market.poll();return;}if(Date.now()-lastSimulationTick<2900)return;lastSimulationTick=Date.now();try{const before=state.orders.filter(o=>o.status==='filled').length;await transact(s=>tick(s));if(state.orders.filter(o=>o.status==='filled').length>before)notify('A limit order reached its target and was filled.');render();updateTicket();}catch(error){console.error('Simulation update failed:',error);}},1000);
+setInterval(async()=>{if(mode==='live'){market.poll();return;}if(Date.now()-lastSimulationTick<2900)return;lastSimulationTick=Date.now();try{const before=state.orders.filter(o=>o.status==='filled').length;await transact(s=>tick(s));if(state.orders.filter(o=>o.status==='filled').length>before)notify('A limit order reached its target and was filled.');if(page!=='connections')render();updateTicket();}catch(error){console.error('Simulation update failed:',error);}},1000);
