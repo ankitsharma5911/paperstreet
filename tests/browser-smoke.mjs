@@ -24,7 +24,7 @@ try{
   const screenshot=async name=>{await evaluate('window.scrollTo(0,0)');await sleep(250);const result=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(path.join(artifacts,name),Buffer.from(result.data,'base64'));};
   await cdp('Runtime.enable');await cdp('Page.enable');await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,deviceScaleFactor:1,mobile:false});
   await cdp('Page.navigate',{url:'http://127.0.0.1:3000'});await wait(`document.querySelector('.chart-panel')!==null`);
-  await evaluate(`localStorage.removeItem('paperstreet.nse.v1');location.reload()`);await wait(`document.querySelector('.chart-panel')!==null`);await sleep(700);
+  await evaluate(`localStorage.setItem('paperstreet.mode','simulation');localStorage.removeItem('paperstreet.nse.v1');location.reload()`);await wait(`document.querySelector('.chart-panel')!==null`);await sleep(700);
   await screenshot('desktop.png');
   assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'Desktop should not overflow');
   await click('.intro-actions [data-action="trade"]');await wait(`document.querySelector('#order-form')!==null`);await sleep(230);

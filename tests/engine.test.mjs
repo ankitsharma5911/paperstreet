@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {INITIAL_FUNDS,createState,validState,placeOrder,cancelOrder,buyingPower,availableShares,portfolio,settleOrders,tick} from '../dist/engine.js';
+import {INITIAL_FUNDS,createState,validState,placeOrder,cancelOrder,buyingPower,availableShares,portfolio,settleOrders,tick} from '../public/terminal/engine.js';
 const order=(s,options={})=>placeOrder(s,{symbol:'RELIANCE',side:'buy',type:'market',qty:10,...options});
 test('a new account starts with ₹10 lakh and no holdings',()=>{
   const s=createState();assert.equal(s.cash,INITIAL_FUNDS);assert.equal(portfolio(s).totalReturn,0);assert.equal(validState(s),true);

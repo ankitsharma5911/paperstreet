@@ -1,30 +1,74 @@
 # Paperstreet
 
-A responsive paper trading web app for Indian stocks. Start with ₹10,00,000 in virtual funds, explore 16 NSE companies, place market and limit orders, manage a watchlist, and follow portfolio returns.
+Indian equities, index futures and options paper trading with virtual funds. Each simulation or broker-data account starts with ₹10,00,000. Real broker orders are never submitted.
 
-## Run locally
+## Connect your daily Zerodha enctoken
 
-Requires Node.js 20 or newer. No dependencies or API keys are needed.
+1. Open **Data connections → Zerodha web session**.
+2. Paste the current `enctoken` value from your own authenticated Kite session. Enter only the token value, not other cookies.
+3. Select **Connect & validate feed**. Update the token daily, or whenever Zerodha rejects the session.
+4. Open **Futures & options** to browse current broker-listed contracts and place paper orders.
+
+The web-session adapter calls Zerodha's unofficial `/oms/quote` endpoint with an `enctoken` authorization header. It may be blocked or changed by Zerodha. It does not automate login, collect a password/OTP, or bypass broker challenges. Broker authentication and live production quotes cannot be verified until a valid user token is supplied in the app.
+
+Official alternatives are available in Data connections:
+
+- **Kite Connect:** API key and access token obtained through the [official login flow](https://kite.trade/docs/connect/v3/user/). Live quote access needs the appropriate entitlement.
+- **Groww Trading API:** access token from an enabled API account. See [Groww's documentation](https://groww.in/trade-api/docs/curl).
+
+## Live data behavior
+
+- Broker quotes are REST snapshots polled approximately every five seconds, not WebSocket tick streaming.
+- Broker mode never replaces missing, rejected, or stale quotes with simulated prices. Chart lines contain only snapshots observed in that account while the app is open; synthetic history is shown only in Simulation.
+- Market and limit fills require a fresh exchange timestamp during weekday NSE continuous-market hours, 09:15–15:30 IST. Old exchange timestamps also prevent holiday or stale-price fills. There is no separate holiday-calendar integration.
+- A new execution quote is fetched before each submitted paper order. Up to ten open orders receive execution snapshots during polling.
+- Limit orders execute only while the app is open and the quote passes freshness checks.
+- Current index contract symbols, expiries, strikes and lot sizes are loaded from broker instrument masters and cached per day. No contract expiry or lot size is hardcoded into live trading.
+- Supported F&O underlyings are NIFTY, BANKNIFTY, FINNIFTY and MIDCPNIFTY, where listed. Equity derivatives and physical settlement are outside this version.
+
+## Paper accounting
+
+- Equities support whole-share delivery buys and selling owned, unreserved shares.
+- Index futures and options support long and short paper positions in whole broker-defined lots. Close-only orders reduce existing positions without reversing them.
+- Futures do not debit full notional value. Their cash P&L is realized when closed. Option premiums, short-option liabilities, realized and unrealized P&L are accounted for in integer paise.
+- Futures and short options reserve an illustrative **20% of notional** as paper margin. This is not exchange SPAN/exposure margin or an actual broker margin quote. There is no automatic daily futures settlement, liquidation or brokerage/tax calculation.
+- Expired open orders are cancelled. Expired index positions require the user to enter the published final underlying settlement price using **Settle expiry**. The engine then cash-settles futures or option intrinsic value, including worthless options. It does not invent an official settlement price.
+- Simulation and each broker provider have separate local paper accounts. Old simulation progress is preserved under its original storage key. Disconnecting a broker preserves its paper holdings.
+
+## Credentials and storage
+
+Broker tokens are validated server-side and stored in AES-GCM encrypted, HttpOnly, SameSite=Strict cookies bound to the signed-in Site visitor. HTTPS sessions also use Secure cookies. Tokens are not returned to client JavaScript, written to localStorage, included in exports, or logged. App sessions expire at 06:00 IST; a broker can invalidate its token sooner.
+
+Production uses the secret `BROKER_SESSION_SECRET`, configured through Sites runtime environment variables. Never place a production secret in source or the hosting manifest. Local `.dev.vars` and `.env*` files are ignored.
+
+Paper holdings, orders, chart samples and quotes remain in this browser and origin, without cross-device synchronization. Clearing browser data removes them. CSV export and explicit account reset are available in Settings.
+
+## Development
+
+Requires Node.js 22.13 or newer.
 
 ```sh
-npm start
+npm ci
+npm run dev
 ```
 
-Open http://127.0.0.1:3000. Run the trading engine checks with `npm test`.
+For Vinext preview, open http://127.0.0.1:5173/signin-with-chatgpt?return_to=/terminal/index.html to establish the starter's local development identity. Set `BROKER_SESSION_SECRET` to a local development value in an ignored `.dev.vars` file.
 
-## Behavior
+`npm run preview:terminal` serves a faster standalone preview at http://127.0.0.1:3000. This loopback-only server uses a local identity and a development encryption key; hosted deployments use the Vinext routes and Sites visitor identity.
 
-- Prices, chart history, benchmarks, and volumes are simulated. This app has no live NSE data connection.
-- Market orders fill at the current simulated quote. Marketable limit orders also fill immediately; other limits wait for a matching quote.
-- Open buy orders reserve cash. Open sell orders reserve shares. Cancelling releases the reservation.
-- Whole shares, long positions, delivery trades only. No short selling, margin, fees, taxes, or exchange-hours enforcement.
-- The simulator advances every three seconds while a tab is open. Orders have no expiry and do not execute with the app closed.
-- Cash and cost basis use integer paise. Portfolio returns include realized and unrealized profit or loss.
-- Data stays in localStorage on the current browser and origin. It is not a server-backed account and does not sync between devices. Browser Web Locks coordinate account writes across tabs where supported.
-- Export order history from the header or Settings. Resetting requires typing RESET and clears the local practice account.
+```sh
+npm test
+npm run build
+```
 
-## Files
+`tests/browser-smoke.mjs` checks the existing simulation experience. `tests/browser-live.mjs` checks live-mode UI, F&O orders, provider isolation and failure handling using explicit broker fixtures and a test clock. These browser scripts use an isolated installed Chrome profile on Windows and are not live broker verification.
 
-`dist/` contains the deployable static app. `dist/engine.js` is the independent ledger and order matching module. `dist/app.js` implements routing, charts, forms, simulation, and persistence. `server.mjs` serves local previews. Tests use Node’s built-in test runner.
+## Source
 
-The app works without external JavaScript dependencies. Google Fonts is optional; system fonts are used if it cannot load.
+- `public/terminal/`: responsive trading UI, simulation, paper ledger and F&O engine.
+- `lib/market/`: server-only broker adapters, streaming instrument parser, encrypted sessions and request authorization.
+- `app/api/market/[action]/route.ts`: authenticated market-data endpoints.
+- `build/`, `scripts/`, `vite.config.ts`: retained Sites/Vinext build and hosting integration.
+- `tests/`: ledger, derivatives, API/session and browser checks.
+
+The deployed Site keeps its original private audience. `.openai/hosting.json` retains the original project identity; the static publication was migrated to a Worker for server-side market-data requests.

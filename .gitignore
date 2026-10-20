@@ -3,3 +3,12 @@ artifacts/
 *.tar.gz
 *.log
 .sites-local/
+dist/
+.next/
+.vinext/
+.wrangler/
+.sites-runtime/
+.env*
+!.env.example
+next-env.d.ts
+.dev.vars*
