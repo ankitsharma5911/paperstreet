@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101313">
+  <meta name="description" content="Your space to learn the market. Practice trading NSE stocks with virtual funds, simulated prices, and a portfolio of your own.">
+  <title>Paperstreet — NSE Paper Trading</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg"><link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar" aria-label="Main navigation">
+      <a href="#overview" class="brand"><img src="./favicon.svg" alt="" width="31" height="31"><span>paperstreet<span class="brand-dot">.</span></span></a>
+      <button class="workspace-switch" data-action="help"><span class="workspace-icon">P</span><span>My workspace<small>Personal account</small></span><span class="workspace-chevron">⌄</span></button>
+      <span class="nav-caption">WORKSPACE</span>
+      <nav id="nav"></nav>
+      <div class="sidebar-bottom">
+        <div class="practice-card"><span class="practice-icon" data-icon="sprout"></span><strong>A little practice.<br>A lot of possibility.</strong><p>Your next great trade<br>starts with a little learning.</p><button data-action="help">How it works <span>↗</span></button></div>
+        <button class="nav-item" data-action="settings"><span data-icon="settings"></span>Settings</button>
+        <button class="profile" data-action="settings"><span class="avatar">YT</span><span>Your trading space<small>Paper account</small></span><span data-icon="chevron-right"></span></button>
+      </div>
+    </aside>
+    <div class="mobile-backdrop" data-action="close-menu"></div>
+    <div class="main-shell">
+      <header class="topbar">
+        <div class="breadcrumb"><button class="icon-button mobile-toggle" data-action="menu" aria-label="Toggle navigation"><span data-icon="menu"></span></button><span class="desktop-crumb">Workspace <span class="crumb-divider">/</span></span><span id="page-crumb">Overview</span></div>
+        <div class="topbar-actions"><div class="global-search"><span data-icon="search"></span><input id="search" aria-label="Search NSE stocks" placeholder="Search stocks, symbols…" autocomplete="off"><kbd>Ctrl K</kbd><div id="search-results" class="search-results" hidden></div></div><span class="practice-badge"><i></i> Practice mode</span><button class="icon-button" data-action="help" aria-label="Help and getting started"><span data-icon="help"></span></button></div>
+      </header>
+      <main id="main" tabindex="-1"></main>
+      <footer><span><i class="tiny-dot"></i> Simulation running <span class="footer-divider">·</span> Prices are simulated, not live NSE data</span><span>Learn. Practice. Grow. <span class="footer-sprout">↗</span></span></footer>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
