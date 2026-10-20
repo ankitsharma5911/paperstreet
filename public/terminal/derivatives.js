@@ -1,7 +1,11 @@
 export const FNO_MARGIN_RATE=.2;
 export const expiryTime=contract=>Date.parse(contract.expiry+'T15:30:00+05:30');
 export function marketOpen(now=Date.now()) {const d=new Date(now+330*60000),day=d.getUTCDay(),minutes=d.getUTCHours()*60+d.getUTCMinutes();return day>0&&day<6&&minutes>=555&&minutes<930;}
-export function executableQuote(quote,now=Date.now()){return quote&&quote.price>0&&now-quote.receivedAt<=15000&&quote.exchangeAt&&Math.abs(now-quote.exchangeAt)<=120000&&marketOpen(now);}
+export function executableQuote(quote,now=Date.now()){
+  if(!quote||quote.price<=0||quote.receivedAt>now+5000||now-quote.receivedAt>15000||!marketOpen(now))return false;
+  if(quote.source==='zerodha-history')return quote.pricing==='completed-minute-close'&&Number.isFinite(quote.candleAt)&&quote.candleEndAt===quote.candleAt+60000&&quote.candleEndAt<=now&&now-quote.candleEndAt<=90000&&quote.fetchedAt<=now+5000&&now-quote.fetchedAt<=90000&&marketOpen(quote.candleAt);
+  return quote.exchangeAt&&Math.abs(now-quote.exchangeAt)<=120000;
+}
 export function contractValid(c){return c&&c.id===c.symbol&&/^NFO:[A-Z0-9-]+$/.test(c.id)&&['FUT','CE','PE'].includes(c.kind)&&['NIFTY','BANKNIFTY','FINNIFTY','MIDCPNIFTY'].includes(c.underlying)&&/^\d{4}-\d{2}-\d{2}$/.test(c.expiry)&&Number.isFinite(expiryTime(c))&&Number.isSafeInteger(c.lotSize)&&c.lotSize>0&&Number.isSafeInteger(c.strike)&&c.strike>=0;}
 export const derivativesMargin=s=>Object.values(s.derivatives??{}).reduce((sum,p)=>sum+p.margin,0);
 export const derivativesUnrealized=s=>Object.entries(s.derivatives??{}).reduce((sum,[id,p])=>sum+p.qty*(s.quotes[id]??Math.round(p.basis/p.qty))-p.basis,0);

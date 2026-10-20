@@ -44,6 +44,7 @@ export function portfolio(s) {
   return {invested,marketValue,equity,unrealized:marketValue-invested+derivativesUnrealized(s),totalReturn:equity-s.initial,returnPct:(equity/s.initial-1)*100,margin:derivativesMargin(s)};
 }
 function execute(s,order,price) {
+  const feed=s.quoteMeta?.[order.symbol];if(feed?.source==='zerodha-history'){order.pricing='completed-minute-close';order.candleEndAt=feed.candleEndAt;}
   if(order.asset==='FNO'){
     if(!order.reduceOnly&&paperMargin(s.contracts[order.symbol],order.side,order.qty,price,s.spots?.[s.contracts[order.symbol].underlying])>buyingPower(s)+(order.reserve??0))throw new Error('Paper margin changed before the order could fill.');
     return executeDerivative(s,order,price);
@@ -72,7 +73,7 @@ export function placeOrder(state,{symbol,side,type,qty,limit,reduceOnly=false},n
   if (!Number.isSafeInteger(qty)||qty<1||qty>1_000_000) throw new Error('Enter a whole number of shares between 1 and 10,00,000.');
   if (type==='limit'&&(!Number.isSafeInteger(limit)||limit<=0||limit>1_000_000_000)) throw new Error('Enter a valid limit price greater than ₹0.');
   const price=state.quotes[symbol];
-  if(state.mode==='live'&&!executableQuote(state.quoteMeta?.[symbol],now))throw new Error('A fresh exchange quote during market hours is required. Live paper fills are paused.');
+  if(state.mode==='live'&&!executableQuote(state.quoteMeta?.[symbol],now))throw new Error(state.quoteMeta?.[symbol]?.source==='zerodha-history'?'A fresh, completed one-minute candle during market hours is required. Candle-based paper fills are paused.':'A fresh exchange quote during market hours is required. Live paper fills are paused.');
   const cost=qty*(type==='limit'?limit:price);
   if (!Number.isSafeInteger(cost)) throw new Error('Order value is too large.');
   if(!derivative&&side==='buy'&&cost>buyingPower(state)) throw new Error('Insufficient buying power. Reduce the quantity or cancel an open buy order.');
@@ -80,7 +81,7 @@ export function placeOrder(state,{symbol,side,type,qty,limit,reduceOnly=false},n
   if(state.mode==='live'&&state.orders.filter(o=>o.status==='open').length>=10)throw new Error('Cancel an open order before adding another (10 open orders per live account).');
   const reserve=derivative?validateDerivativeOrder(state,{symbol,side,type,qty,limit,reduceOnly},buyingPower(state),now):undefined;
   const s=structuredClone(state);
-  const order={id:`PS-${now.toString(36).toUpperCase()}-${s.orders.length+1}`,symbol,side,type,qty,limit:type==='limit'?limit:null,status:'open',createdAt:now,...(derivative?{asset:'FNO',reserve,reduceOnly,lotSize:derivative.lotSize,kind:derivative.kind}:{}),source:state.mode==='live'?'broker':'simulation'};
+  const order={id:`PS-${now.toString(36).toUpperCase()}-${s.orders.length+1}`,symbol,side,type,qty,limit:type==='limit'?limit:null,status:'open',createdAt:now,...(derivative?{asset:'FNO',reserve,reduceOnly,lotSize:derivative.lotSize,kind:derivative.kind}:{}),source:state.mode==='live'?(state.quoteMeta?.[symbol]?.source==='zerodha-history'?'zerodha-candle-close':'broker'):'simulation'};
   s.orders.unshift(order);
   if (type==='market'||side==='buy'&&price<=limit||side==='sell'&&price>=limit) execute(s,order,price);
   s.updatedAt=now;

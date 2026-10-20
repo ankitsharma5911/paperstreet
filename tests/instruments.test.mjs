@@ -18,7 +18,7 @@ test('instrument calendar rolls at IST midnight and 08:30, not UTC midnight',()=
 
 test('daily master download is combined, cached and refreshed with current broker metadata',async()=>{
   const load=createCatalogLoader();let calls=0;
-  const fetcher=async(url,init)=>{assert.equal(String(url),'https://api.kite.trade/instruments/NFO');assert.equal(init.headers.Authorization,undefined);calls++;await new Promise(r=>setTimeout(r,5));return new Response(csv(calls===1?65:75,calls));};
+  const fetcher=async(url,init)=>{assert.equal(String(url),'https://api.kite.trade/instruments');assert.equal(init.headers.Authorization,undefined);calls++;await new Promise(r=>setTimeout(r,5));return new Response(csv(calls===1?65:75,calls));};
   const options={fetcher,now:at('2026-10-20T10:00:00')};
   const [a,b]=await Promise.all([load(session,options),load(session,options)]);assert.equal(calls,1);assert.equal(a,b);assert.equal(a.instruments[0].lotSize,65);assert.equal(a.asOf,'2026-10-20');
   await load(session,{...options,now:at('2026-10-20T23:59:59')});assert.equal(calls,1);
