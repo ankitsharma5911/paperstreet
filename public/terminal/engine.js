@@ -1,4 +1,5 @@
 import {derivativesMargin,futuresUnrealized,optionsMarketValue,optionsBasis,derivativesUnrealized,contractValid,validateDerivativeOrder,executeDerivative,expireDerivativeOrders,executableQuote,paperMargin,expiryTime} from './derivatives.js';
+import {equityListed} from './equities.js';
 export const INITIAL_FUNDS = 100_000_000; // All money is stored as integer paise.
 export const STOCKS = [
   {symbol:'RELIANCE',name:'Reliance Industries',sector:'Energy',price:144285,close:142010,color:'#3f72c9',mark:'R',volume:'82.4L'},
@@ -18,21 +19,22 @@ export const STOCKS = [
   {symbol:'WIPRO',name:'Wipro',sector:'Technology',price:26785,close:27140,color:'#9374b0',mark:'W',volume:'63.2L'},
   {symbol:'TITAN',name:'Titan Company',sector:'Consumer',price:332840,close:328950,color:'#568e95',mark:'T',volume:'12.4L'}
 ];
-export const stockBySymbol = symbol => STOCKS.find(s => s.symbol === symbol);
+export const stockBySymbol = (symbol,state) => (state?.mode==='live'?state.equities?.[symbol]:null)??STOCKS.find(s => s.symbol === symbol);
 export function createState(now = Date.now(),mode='simulation') {
   return {version:1,mode,initial:INITIAL_FUNDS,cash:INITIAL_FUNDS,realized:0,positions:{},derivatives:{},contracts:{},spots:{},quoteMeta:{},liveSeries:{},orders:[],watchlist:['RELIANCE','TCS','HDFCBANK','INFY','ICICIBANK'],quotes:mode==='live'?{}:Object.fromEntries(STOCKS.map(s=>[s.symbol,s.price])),seed:243769,createdAt:now,updatedAt:now};
 }
 export function validState(s) {
   if (!s || s.version!==1 || s.initial!==INITIAL_FUNDS || !Number.isSafeInteger(s.cash) || !Number.isSafeInteger(s.realized) || !s.positions || typeof s.positions!=='object' || !Array.isArray(s.orders) || !Array.isArray(s.watchlist) || !s.quotes || !Number.isInteger(s.seed)) return false;
-  if (!Object.entries(s.positions).every(([symbol,p])=>stockBySymbol(symbol)&&p&&Number.isSafeInteger(p.qty)&&p.qty>0&&Number.isSafeInteger(p.cost)&&p.cost>=0)) return false;
+  if (!Object.values(s.equities??{}).every(e=>e&&e.kind==='EQ'&&typeof e.symbol==='string'&&typeof e.name==='string'&&/^\d+$/.test(e.instrumentToken))) return false;
+  if (!Object.entries(s.positions).every(([symbol,p])=>stockBySymbol(symbol,s)&&p&&Number.isSafeInteger(p.qty)&&p.qty>0&&Number.isSafeInteger(p.cost)&&p.cost>=0)) return false;
   if (s.mode!=='live'&&!STOCKS.every(stock=>Number.isSafeInteger(s.quotes[stock.symbol])&&s.quotes[stock.symbol]>0)) return false;
   if (!Object.values(s.quotes).every(p=>Number.isSafeInteger(p)&&p>=0)) return false;
   if (!Object.values(s.contracts??{}).every(contractValid)) return false;
   if (!Object.entries(s.derivatives??{}).every(([id,p])=>s.contracts?.[id]&&Number.isSafeInteger(p.qty)&&p.qty!==0&&p.qty%s.contracts[id].lotSize===0&&Number.isSafeInteger(p.basis)&&Math.sign(p.basis)===Math.sign(p.qty)&&Number.isSafeInteger(p.margin)&&p.margin>=0)) return false;
-  if (!s.watchlist.every(symbol=>!!stockBySymbol(symbol))) return false;
-  if (!s.orders.every(o=>o&&typeof o.id==='string'&&(stockBySymbol(o.symbol)||s.contracts?.[o.symbol])&&['buy','sell'].includes(o.side)&&['market','limit'].includes(o.type)&&['open','filled','cancelled'].includes(o.status)&&Number.isSafeInteger(o.qty)&&o.qty>0&&Number.isFinite(o.createdAt)&&(o.type==='market'||Number.isSafeInteger(o.limit)&&o.limit>0)&&(o.status!=='filled'||Number.isSafeInteger(o.price)&&o.price>=0))) return false;
+  if (!s.watchlist.every(symbol=>!!stockBySymbol(symbol,s))) return false;
+  if (!s.orders.every(o=>o&&typeof o.id==='string'&&(stockBySymbol(o.symbol,s)||s.contracts?.[o.symbol])&&['buy','sell'].includes(o.side)&&['market','limit'].includes(o.type)&&['open','filled','cancelled'].includes(o.status)&&Number.isSafeInteger(o.qty)&&o.qty>0&&Number.isFinite(o.createdAt)&&(o.type==='market'||Number.isSafeInteger(o.limit)&&o.limit>0)&&(o.status!=='filled'||Number.isSafeInteger(o.price)&&o.price>=0))) return false;
   const basis=Object.values(s.positions).reduce((n,p)=>n+p.cost,0)+optionsBasis(s);
-  return s.cash+basis===s.initial+s.realized&&STOCKS.every(stock=>availableShares(s,stock.symbol)>=0);
+  return s.cash+basis===s.initial+s.realized&&[...new Set([...Object.keys(s.positions),...s.orders.filter(o=>o.asset!=='FNO').map(o=>o.symbol)])].every(symbol=>availableShares(s,symbol)>=0);
 }
 export const reservedCash = s => s.orders.filter(o=>o.status==='open').reduce((n,o)=>n+(o.asset==='FNO'?(o.reserve??0):o.side==='buy'?o.qty*o.limit:0),0);
 export const buyingPower = s => s.cash-reservedCash(s)-derivativesMargin(s)+Math.min(0,futuresUnrealized(s));
@@ -68,7 +70,10 @@ function execute(s,order,price) {
 }
 export function placeOrder(state,{symbol,side,type,qty,limit,reduceOnly=false},now=Date.now()) {
   const derivative=state.contracts?.[symbol];
-  if (!stockBySymbol(symbol)&&!derivative) throw new Error('Choose a valid NSE stock or listed F&O contract.');
+  if (!stockBySymbol(symbol,state)&&!derivative) throw new Error('Choose a valid NSE stock or listed F&O contract.');
+  if(!derivative&&state.mode==='live'&&state.equityRevision!==undefined&&!equityListed(state,symbol,now))throw new Error('This stock is unavailable in the current instrument file. Refresh the stock list.');
+  const tickSize=state.equities?.[symbol]?.tickSize;
+  if(!derivative&&type==='limit'&&tickSize&&limit%tickSize!==0)throw new Error('Use the stock’s current price tick of ₹'+(tickSize/100).toFixed(2)+'.');
   if (!['buy','sell'].includes(side)||!['market','limit'].includes(type)) throw new Error('Choose a valid order type.');
   if (!Number.isSafeInteger(qty)||qty<1||qty>1_000_000) throw new Error('Enter a whole number of shares between 1 and 10,00,000.');
   if (type==='limit'&&(!Number.isSafeInteger(limit)||limit<=0||limit>1_000_000_000)) throw new Error('Enter a valid limit price greater than ₹0.');
@@ -104,6 +109,7 @@ export function settleOrders(state) {
   const s=expireDerivativeOrders(structuredClone(state));
   for (const order of [...s.orders].reverse()) {
     if (order.status!=='open') continue;
+    if(order.asset!=='FNO'&&s.mode==='live'&&s.equityRevision!==undefined&&!equityListed(s,order.symbol))continue;
     const price=s.quotes[order.symbol];
     if(s.mode==='live'&&!executableQuote(s.quoteMeta?.[order.symbol]))continue;
     if (order.side==='buy'?price<=order.limit:price>=order.limit){try{execute(s,order,price);}catch{order.status='cancelled';order.reason='Position or funds changed before execution';}}

@@ -6,7 +6,7 @@ import {handleMarket} from '../lib/market/api.mjs';
 import {createState,placeOrder,settleOrders,validState} from '../public/terminal/engine.js';
 import {executableQuote} from '../public/terminal/derivatives.js';
 const now=Date.parse('2026-10-20T10:00:30+05:30'),session={provider:'zerodha-web',token:'fixture-only-no-real-token',brokerUserId:'TEST123'};
-const master='instrument_token,tradingsymbol,name,expiry,strike,tick_size,lot_size,instrument_type,exchange\n789,RELIANCE,RELIANCE,,0,0.05,1,EQ,NSE\n123456,NIFTY 50,NIFTY 50,,0,0.05,1,EQ,NSE\n654,NIFTYTESTFUT,NIFTY,2026-10-27,0,0.05,65,FUT,NFO\n';
+const master='instrument_token,tradingsymbol,name,expiry,strike,tick_size,lot_size,instrument_type,exchange,segment\n789,RELIANCE,RELIANCE,,0,0.05,1,EQ,NSE,NSE\n123456,NIFTY 50,NIFTY 50,,0,0.05,1,EQ,NSE,NSE\n654,NIFTYTESTFUT,NIFTY,2026-10-27,0,0.05,65,FUT,NFO,NFO-FUT\n';
 const rows=[['2026-10-19T15:29:00+0530',990,995,985,990,10,3],['2026-10-20T09:59:00+0530',1000,1005,995,1001,1234,50],['2026-10-20T10:00:00+0530',1001,1009,998,1007,700,60]];
 const upstream=async url=>String(url)==='https://api.kite.trade/instruments'?new Response(master):Response.json({status:'success',data:{candles:rows}});
 const secret='fixture-encryption-secret-over-32-characters';
