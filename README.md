@@ -20,9 +20,10 @@ Official alternatives are available in Data connections:
 
 ## Live data behavior
 
-- **Zerodha enctoken:** candle-based paper trading, using the latest **completed one-minute close**. The app checks rotating batches of up to 16 symbols about every five seconds, with selected instruments, order symbols and index spots prioritized. Historical requests are paced and cached per credential, instrument token and minute. Prices update when a new completed candle becomes available.
+- **Zerodha enctoken:** candle-based paper trading, using the latest **completed one-minute close**. The app quotes only what the current page shows, plus open orders, in rotating batches of up to 16 symbols about every five seconds (every two seconds on Orders), with selected instruments, order symbols and index spots prioritized. Historical requests are cached per credential, instrument token and minute. Prices update when a new completed candle becomes available.
 - Zerodha charts offer 1D, 1W, 1M, 1Y and 5Y ranges using actual intraday or daily candles. Unfinished and future candles are excluded. The chart shows the resolved instrument token and candle date.
-- **Kite Connect and Groww:** actual REST quote snapshots. These are polled approximately every five seconds; this version does not stream WebSocket ticks.
+- **Kite Connect and Groww:** actual REST quote snapshots. These are polled approximately every five seconds (two on Orders), for the current page only; this version does not stream WebSocket ticks.
+- All broker requests from the server, for every provider, are spaced at least 400 ms apart: never more than 3 per second.
 - Broker mode never substitutes simulated prices. Zerodha charts use returned historical candles; other brokers show observed quote history. Synthetic prices are confined to Simulation.
 - Candle-based paper fills require a completed one-minute candle whose end time is no more than 90 seconds old, a recent fetch, and weekday continuous-market hours, 09:15–15:30 IST. Stale, future and unfinished candles cannot fill. Other broker feeds require a fresh exchange quote. There is no separate holiday-calendar integration.
 - Each submitted order refreshes its execution data. F&O candle orders also refresh the underlying spot. Up to ten open orders are prioritized during polling. Candle-based limits compare close prices only; a candle’s intrabar high/low does not trigger a fill. Order history and CSV exports record candle pricing and its close timestamp.
