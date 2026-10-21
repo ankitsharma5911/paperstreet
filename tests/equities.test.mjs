@@ -19,6 +19,8 @@ test('NSE equities come from the master, including symbols outside the former pr
   assert.deepEqual(matchStocks([tata,ved],'tata motors').map(s=>s.symbol),['TMPV']);
   assert.deepEqual(matchStocks([tata,ved],'TATAMOTORS'),[tata]);
   assert.deepEqual(matchStocks([tata,ved],'not listed'),[]);
+  const list=['0ABCL31-N0','ZYDUSLIFE','AARTIIND-BE','RELIANCE','ACC','HDFCBANK'].map(symbol=>({symbol,name:symbol}));
+  assert.deepEqual(matchStocks(list).map(s=>s.symbol),['RELIANCE','HDFCBANK','ACC','ZYDUSLIFE','0ABCL31-N0','AARTIIND-BE']);
 });
 test('new stocks trade, persist and retain positions when removed; pending orders are cancelled',()=>{
   const initial=createState(now,'live');initial.watchlist.push('VEDL');initial.equities={VEDL:ved};let state=reconcileEquities(initial,[ved],instrumentDay(now).revision);
